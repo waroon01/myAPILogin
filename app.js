@@ -90,7 +90,7 @@ app.post('/login', jsonParser, async function (req, res, next) {
     });
 
     const [rows] = await connection.execute(
-      'SELECT id, password, firstName, lastName FROM userLogin WHERE email = ?',
+      'SELECT id, password, firstName, lastName, role FROM userLogin WHERE email = ?',
       [email]
     );
 
@@ -108,7 +108,7 @@ app.post('/login', jsonParser, async function (req, res, next) {
     }
 
     const accessToken = jwt.sign(
-      { userId: user.id, email, firstName: user.firstName, lastName: user.lastName },
+      { userId: user.id, email, firstName: user.firstName, lastName: user.lastName, role: user.role },
       JWT_SECRET_KEY,
       { expiresIn: '1h' }
     );
