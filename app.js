@@ -72,6 +72,64 @@ app.post('/register', jsonParser, async function (req, res, next) {
   }
 });
 
+// เพิ่ม endpoint สำหรับการเข้าสู่ระบบ
+app.post('/login', jsonParser, async function (req, res, next) {
+  try {
+    let { email, password } = req.body; // รับข้อมูลจาก request body
+    console.log({ email, password });
+
+    // สร้างการเชื่อมต่อกับฐานข้อมูล
+    const connection = await mysql.createConnection({
+      host: 'thsv89.hostatom.com',
+      user: 'green_test1',
+      password: '?Nq33c7f9',
+      database: 'green_test1',
+    });
+
+    // ตรวจสอบอีเมลล์
+    const [rows] = await connection.execute(
+      'SELECT id, password, firstName, lastName FROM userLogin WHERE email = ?',
+      [email]
+    );
+
+    if (rows.length === 0) {
+      // อีเมลล์ไม่พบ
+      await connection.end();
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const user = rows[0];
+
+    // ตรวจสอบรหัสผ่าน
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      // รหัสผ่านไม่ถูกต้อง
+      await connection.end();
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // สร้าง accessToken
+    const accessToken = jwt.sign(
+      { userId: user.id, email: email, firstName: user.firstName, lastName: user.lastName },
+      JWT_SECRET_KEY,
+      { expiresIn: '1h' } // กำหนดระยะเวลาให้ accessToken หมดอายุ
+    );
+
+    // ปิดการเชื่อมต่อ
+    await connection.end();
+
+    // ส่งผลลัพธ์กลับไปให้ client
+    res.json({
+      msg: 'Login successful!',
+      accessToken,
+    });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: 'Database connection error' });
+  }
+});
+
 // New endpoint to get all users
 app.post('/users', jsonParser, async function (req, res, next) {
   try {
