@@ -1,17 +1,30 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const mysql = require('mysql2/promise'); // ใช้ mysql2/promise เพื่อรองรับ async/await
+const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
-// ตั้งค่าคีย์ลับสำหรับ JWT
 const JWT_SECRET_KEY = 'i love you nunyu';
 
-var app = express();
-var jsonParser = bodyParser.json();
+const app = express();
+const jsonParser = bodyParser.json();
 
 app.use(cors());
+
+// Middleware ตรวจสอบ JWT
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) return res.status(401).json({ error: 'Token is missing' });
+
+  jwt.verify(token, JWT_SECRET_KEY, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+}
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
@@ -19,10 +32,9 @@ app.get('/', (req, res) => {
 
 app.post('/register', jsonParser, async function (req, res, next) {
   try {
-    let { email, password, firstName, lastName } = req.body; // รับข้อมูลจาก request body
+    let { email, password, firstName, lastName } = req.body;
     console.log({ email, password, firstName, lastName });
 
-    // สร้างการเชื่อมต่อกับฐานข้อมูล
     const connection = await mysql.createConnection({
       host: 'thsv89.hostatom.com',
       user: 'green_test1',
@@ -30,38 +42,31 @@ app.post('/register', jsonParser, async function (req, res, next) {
       database: 'green_test1',
     });
 
-    // ตรวจสอบว่ามีอีเมลล์ที่ซ้ำกันหรือไม่
     const [rows] = await connection.execute(
       'SELECT email FROM userLogin WHERE email = ?',
       [email]
     );
 
     if (rows.length > 0) {
-      // อีเมลล์มีอยู่แล้ว
       await connection.end();
       return res.status(400).json({ error: 'Duplicate email' });
     }
 
-    // แฮชรหัสผ่าน
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // อีเมลล์ไม่มีอยู่แล้ว, ดำเนินการเพิ่มข้อมูล
     const [result] = await connection.execute(
       'INSERT INTO userLogin (email, password, firstName, lastName) VALUES (?, ?, ?, ?)',
       [email, hashedPassword, firstName, lastName]
     );
 
-    // สร้าง accessToken
     const accessToken = jwt.sign(
-      { userId: result.insertId, email: email, firstName: firstName, lastName: lastName },
+      { userId: result.insertId, email, firstName, lastName },
       JWT_SECRET_KEY,
-      { expiresIn: '1h' } // กำหนดระยะเวลาให้ accessToken หมดอายุ
+      { expiresIn: '1h' }
     );
 
-    // ปิดการเชื่อมต่อ
     await connection.end();
 
-    // ส่งผลลัพธ์กลับไปให้ client
     res.json({
       msg: 'User registered successfully!',
       accessToken,
@@ -72,13 +77,11 @@ app.post('/register', jsonParser, async function (req, res, next) {
   }
 });
 
-// เพิ่ม endpoint สำหรับการเข้าสู่ระบบ
 app.post('/login', jsonParser, async function (req, res, next) {
   try {
-    let { email, password } = req.body; // รับข้อมูลจาก request body
+    let { email, password } = req.body;
     console.log({ email, password });
 
-    // สร้างการเชื่อมต่อกับฐานข้อมูล
     const connection = await mysql.createConnection({
       host: 'thsv89.hostatom.com',
       user: 'green_test1',
@@ -86,40 +89,32 @@ app.post('/login', jsonParser, async function (req, res, next) {
       database: 'green_test1',
     });
 
-    // ตรวจสอบอีเมลล์
     const [rows] = await connection.execute(
       'SELECT id, password, firstName, lastName FROM userLogin WHERE email = ?',
       [email]
     );
 
     if (rows.length === 0) {
-      // อีเมลล์ไม่พบ
       await connection.end();
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const user = rows[0];
-
-    // ตรวจสอบรหัสผ่าน
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      // รหัสผ่านไม่ถูกต้อง
       await connection.end();
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // สร้าง accessToken
     const accessToken = jwt.sign(
-      { userId: user.id, email: email, firstName: user.firstName, lastName: user.lastName },
+      { userId: user.id, email, firstName: user.firstName, lastName: user.lastName },
       JWT_SECRET_KEY,
-      { expiresIn: '1h' } // กำหนดระยะเวลาให้ accessToken หมดอายุ
+      { expiresIn: '1h' }
     );
 
-    // ปิดการเชื่อมต่อ
     await connection.end();
 
-    // ส่งผลลัพธ์กลับไปให้ client
     res.json({
       msg: 'Login successful!',
       accessToken,
@@ -130,10 +125,8 @@ app.post('/login', jsonParser, async function (req, res, next) {
   }
 });
 
-// New endpoint to get all users
 app.post('/users', jsonParser, async function (req, res, next) {
   try {
-    // Create the connection to database
     const connection = await mysql.createConnection({
       host: 'thsv89.hostatom.com',
       user: 'green_test1',
@@ -141,14 +134,41 @@ app.post('/users', jsonParser, async function (req, res, next) {
       database: 'green_test1',
     });
 
-    // Query to get all users
     const [rows] = await connection.execute('SELECT * FROM userLogin');
 
-    // Close the connection
     await connection.end();
 
-    // Send the user data back to client
     res.json(rows);
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: 'Database connection error' });
+  }
+});
+
+// New endpoint to get profile information
+app.get('/profile', authenticateToken, async function (req, res, next) {
+  try {
+    const userId = req.user.userId;
+
+    const connection = await mysql.createConnection({
+      host: 'thsv89.hostatom.com',
+      user: 'green_test1',
+      password: '?Nq33c7f9',
+      database: 'green_test1',
+    });
+
+    const [rows] = await connection.execute(
+      'SELECT email, firstName, lastName FROM userLogin WHERE id = ?',
+      [userId]
+    );
+
+    await connection.end();
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(rows[0]);
   } catch (error) {
     console.error('Database error:', error);
     res.status(500).json({ error: 'Database connection error' });
