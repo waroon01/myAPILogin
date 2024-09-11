@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
 // ตั้งค่าคีย์ลับสำหรับ JWT
-const JWT_SECRET_KEY = 'your_secret_key_here';
+const JWT_SECRET_KEY = 'i love you nunyu';
 
 var app = express();
 var jsonParser = bodyParser.json();
