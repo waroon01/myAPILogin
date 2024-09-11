@@ -13,7 +13,6 @@ app.get('/', (req, res) => {
   res.send('Hello World!')
 })
 
-
 app.post('/register', jsonParser, async function (req, res, next) {
   try {
     let { email, password, firstName, lastName } = req.body; // รับข้อมูลจาก request body
@@ -27,7 +26,19 @@ app.post('/register', jsonParser, async function (req, res, next) {
       database: 'green_test1',
     });
 
-    // Run a query to insert data into userLogin table
+    // Check if email already exists
+    const [rows] = await connection.execute(
+      'SELECT email FROM userLogin WHERE email = ?',
+      [email]
+    );
+
+    if (rows.length > 0) {
+      // Email already exists
+      await connection.end();
+      return res.status(400).json({ error: 'Duplicate email' });
+    }
+
+    // Email does not exist, proceed with insertion
     const [result] = await connection.execute(
       'INSERT INTO userLogin (email, password, firstName, lastName) VALUES (?, ?, ?, ?)',
       [email, password, firstName, lastName]
@@ -38,6 +49,31 @@ app.post('/register', jsonParser, async function (req, res, next) {
 
     // ส่งผลลัพธ์กลับไปให้ client
     res.json({ msg: 'User registered successfully!', userId: result.insertId });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: 'Database connection error' });
+  }
+});
+
+// New endpoint to get all users
+app.post('/users', jsonParser, async function (req, res, next) {
+  try {
+    // Create the connection to database
+    const connection = await mysql.createConnection({
+      host: 'thsv89.hostatom.com',
+      user: 'green_test1',
+      password: '?Nq33c7f9',
+      database: 'green_test1',
+    });
+
+    // Query to get all users
+    const [rows] = await connection.execute('SELECT * FROM userLogin');
+
+    // Close the connection
+    await connection.end();
+
+    // Send the user data back to client
+    res.json(rows);
   } catch (error) {
     console.error('Database error:', error);
     res.status(500).json({ error: 'Database connection error' });
