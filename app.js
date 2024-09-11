@@ -8,7 +8,7 @@ const app = express();
 const port = 3000;
 
 // ตั้งค่าคีย์ลับสำหรับ JWT
-const JWT_SECRET_KEY = 'your_secret_key_here';
+const JWT_SECRET_KEY = 'i love nunyu';
 
 // ตั้งค่าการเก็บข้อมูลผู้ใช้ (สำหรับการทดสอบ)
 const users = [];
