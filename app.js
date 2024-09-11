@@ -53,7 +53,7 @@ app.post('/register', jsonParser, async function (req, res, next) {
 
     // สร้าง accessToken
     const accessToken = jwt.sign(
-      { userId: result.insertId, email: email },
+      { userId: result.insertId, email: email, firstName: firstName, lastName: lastName },
       JWT_SECRET_KEY,
       { expiresIn: '1h' } // กำหนดระยะเวลาให้ accessToken หมดอายุ
     );
