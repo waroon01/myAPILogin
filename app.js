@@ -1,24 +1,28 @@
-var express = require('express');
-var cors = require('cors');
-var app = express();
-var bodyParser = require('body-parser');
-var mysql = require('mysql2/promise'); // ใช้ mysql2/promise เพื่อรองรับ async/await
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const mysql = require('mysql2/promise'); // ใช้ mysql2/promise เพื่อรองรับ async/await
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
-// create application/json parser
+// ตั้งค่าคีย์ลับสำหรับ JWT
+const JWT_SECRET_KEY = 'your_secret_key_here';
+
+var app = express();
 var jsonParser = bodyParser.json();
 
 app.use(cors());
 
 app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
+  res.send('Hello World!');
+});
 
 app.post('/register', jsonParser, async function (req, res, next) {
   try {
     let { email, password, firstName, lastName } = req.body; // รับข้อมูลจาก request body
     console.log({ email, password, firstName, lastName });
 
-    // Create the connection to database
+    // สร้างการเชื่อมต่อกับฐานข้อมูล
     const connection = await mysql.createConnection({
       host: 'thsv89.hostatom.com',
       user: 'green_test1',
@@ -26,29 +30,42 @@ app.post('/register', jsonParser, async function (req, res, next) {
       database: 'green_test1',
     });
 
-    // Check if email already exists
+    // ตรวจสอบว่ามีอีเมลล์ที่ซ้ำกันหรือไม่
     const [rows] = await connection.execute(
       'SELECT email FROM userLogin WHERE email = ?',
       [email]
     );
 
     if (rows.length > 0) {
-      // Email already exists
+      // อีเมลล์มีอยู่แล้ว
       await connection.end();
       return res.status(400).json({ error: 'Duplicate email' });
     }
 
-    // Email does not exist, proceed with insertion
+    // แฮชรหัสผ่าน
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // อีเมลล์ไม่มีอยู่แล้ว, ดำเนินการเพิ่มข้อมูล
     const [result] = await connection.execute(
       'INSERT INTO userLogin (email, password, firstName, lastName) VALUES (?, ?, ?, ?)',
-      [email, password, firstName, lastName]
+      [email, hashedPassword, firstName, lastName]
     );
 
-    // Close the connection
+    // สร้าง accessToken
+    const accessToken = jwt.sign(
+      { userId: result.insertId, email: email },
+      JWT_SECRET_KEY,
+      { expiresIn: '1h' } // กำหนดระยะเวลาให้ accessToken หมดอายุ
+    );
+
+    // ปิดการเชื่อมต่อ
     await connection.end();
 
     // ส่งผลลัพธ์กลับไปให้ client
-    res.json({ msg: 'User registered successfully!', userId: result.insertId });
+    res.json({
+      msg: 'User registered successfully!',
+      accessToken,
+    });
   } catch (error) {
     console.error('Database error:', error);
     res.status(500).json({ error: 'Database connection error' });
