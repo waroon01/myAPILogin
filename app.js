@@ -158,7 +158,7 @@ app.get('/profile', authenticateToken, async function (req, res, next) {
     });
 
     const [rows] = await connection.execute(
-      'SELECT email, firstName, lastName FROM userLogin WHERE id = ?',
+      'SELECT email, firstName, lastName, role FROM userLogin WHERE id = ?',
       [userId]
     );
 
