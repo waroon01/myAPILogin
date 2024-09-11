@@ -10,10 +10,12 @@
     "node": "20.x"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "mysql2": "^3.11.0"
-  },
+  "cors": "^2.8.5",
+  "express": "^4.19.2",
+  "mysql2": "^3.11.0",
+  "jsonwebtoken": "^9.0.0",
+  "bcrypt": "^5.1.0"
+},
   "devDependencies": {},
   "author": "",
   "license": "ISC"
